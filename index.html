@@ -168,9 +168,11 @@
 
     <script>
         const TOTAL_POINTS = 5;
+        const STORAGE_KEY = 'neneWakeUpData';
+
         // 蓋章圖案：水蜜桃與餃子輪流，第5格是皇冠
         const STAMP_ICONS = ['🍑', '🥟', '🍑', '🥟', '👑'];
-        
+
         // ねね風格早安應援語錄
         const CHEER_MESSAGES = [
             'こんねね～！今天也準時起床太棒了！🍑',
@@ -179,13 +181,44 @@
             '早起的ねっ子有餃子吃！繼續保持吧～🧡'
         ];
 
-        let userData = JSON.parse(localStorage.getItem('neneWakeUpData')) || {
-            points: 0,
-            lastCheckInDate: ''
-        };
+        function getDefaultUserData() {
+            return {
+                points: 0,
+                lastCheckInDate: ''
+            };
+        }
 
-        if (userData.points > TOTAL_POINTS) {
-            userData.points = TOTAL_POINTS;
+        function loadUserData() {
+            try {
+                const storedData = localStorage.getItem(STORAGE_KEY);
+                if (!storedData) return getDefaultUserData();
+
+                const parsedData = JSON.parse(storedData);
+                const validPoints = Number.isInteger(parsedData.points)
+                    ? Math.min(Math.max(parsedData.points, 0), TOTAL_POINTS)
+                    : 0;
+
+                return {
+                    points: validPoints,
+                    lastCheckInDate: typeof parsedData.lastCheckInDate === 'string'
+                        ? parsedData.lastCheckInDate
+                        : ''
+                };
+            } catch (error) {
+                // 若資料損毀或瀏覽器禁止存取 localStorage，使用安全的預設值。
+                console.warn('無法讀取集點資料，已重設為初始狀態：', error);
+                return getDefaultUserData();
+            }
+        }
+
+        let userData = loadUserData();
+
+        function saveUserData() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+            } catch (error) {
+                console.warn('無法儲存集點資料：', error);
+            }
         }
 
         function initApp() {
@@ -208,10 +241,10 @@
 
         function updateUI() {
             document.getElementById('pointsDisplay').innerText = `${userData.points} / ${TOTAL_POINTS}`;
-            
+
             const checkInBtn = document.getElementById('checkInBtn');
             const redeemBtn = document.getElementById('redeemBtn');
-            
+
             if (userData.points >= TOTAL_POINTS) {
                 checkInBtn.style.display = 'none';
                 redeemBtn.style.display = 'block';
@@ -237,6 +270,9 @@
                 if (!msg.innerText) {
                     msg.innerText = '明天也要記得來找ねね簽到喔！🍑';
                 }
+            } else {
+                btn.disabled = false;
+                btn.innerText = '🍑 こんねね！起床簽到 (+1)';
             }
         }
 
@@ -247,11 +283,11 @@
             if (userData.points < TOTAL_POINTS) {
                 userData.points += 1;
                 userData.lastCheckInDate = today;
-                localStorage.setItem('neneWakeUpData', JSON.stringify(userData));
-                
+                saveUserData();
+
                 renderGrid();
                 updateUI();
-                
+
                 const msg = document.getElementById('statusMsg');
                 if (userData.points === TOTAL_POINTS) {
                     msg.innerText = '🎉 恭喜集滿 5 點！快點擊下方兌換禮品卡吧！';
@@ -264,20 +300,14 @@
         }
 
         function redeemPrize() {
+            if (userData.points < TOTAL_POINTS) return;
+
             alert('🍑 こんねね～！恭喜ねっ子集滿 5 點！\n請截圖此畫面兌換你的專屬禮品卡 🎁');
             userData.points = 0;
-            localStorage.setItem('neneWakeUpData', JSON.stringify(userData));
+            saveUserData();
             initApp();
-            
-            const btn = document.getElementById('checkInBtn');
+
             const msg = document.getElementById('statusMsg');
-            if (userData.lastCheckInDate === getTodayStr()) {
-                btn.disabled = true;
-                btn.innerText = '今天已簽到完成囉 ✓';
-            } else {
-                btn.disabled = false;
-                btn.innerText = '🍑 こんねね！起床簽到 (+1)';
-            }
             msg.innerText = '新一輪集點卡開始囉！繼續加油 🥟';
         }
 
